@@ -71,10 +71,10 @@ class BATAGEBase : public SimObject
     // BATage Entry
     struct BATageEntry
     {
-        int8_t ctr;
+        int8_t ctr_up;
         uint16_t tag;
-        uint8_t u;
-        BATageEntry() : ctr(0), tag(0), u(0) { }
+        uint8_t ctr_down;
+        BATageEntry() : ctr_up(0), tag(0), ctr_down(0) { }
     };
 
     // Folded History Table - compressed history
@@ -395,7 +395,7 @@ class BATAGEBase : public SimObject
     /**
      * Algorithm for resetting a single U counter
      */
-    virtual void resetUctr(uint8_t & u);
+    virtual void resetUctr(uint8_t & ctr_down, uint8_t & ctr_down);
 
     /**
      * Extra steps for calculating altTaken
@@ -410,8 +410,10 @@ class BATAGEBase : public SimObject
 
     void btbUpdate(ThreadID tid, Addr branch_addr, BranchInfo* &bi);
     unsigned getGHR(ThreadID tid, BranchInfo *bi) const;
-    int8_t getCtr(int hitBank, int hitBankIndex) const;
-    unsigned getBATageCtrBits() const;
+    int8_t getCtr_up(int hitBank, int hitBankIndex) const;
+    int8_t getCtr_down(int hitBank, int hitBankIndex) const;
+    unsigned getBATageCtrUpBits() const;
+    unsigned getBATageCtrDownBits() const;
     int getPathHist(ThreadID tid) const;
     bool isSpeculativeUpdateEnabled() const;
     size_t getSizeInBits() const;
@@ -419,8 +421,8 @@ class BATAGEBase : public SimObject
   protected:
     const unsigned logRatioBiModalHystEntries;
     const unsigned nHistoryTables;
-    const unsigned tagTableCounterBits;
-    const unsigned tagTableUBits;
+    const unsigned tagTableCounterUpBits;
+    const unsigned tagTableCounterDownBits;
     const unsigned histBufferSize;
     const unsigned minHist;
     const unsigned maxHist;
@@ -469,7 +471,7 @@ class BATAGEBase : public SimObject
 
     std::vector<int8_t> useAltPredForNewlyAllocated;
     int64_t tCounter;
-    uint64_t logUResetPeriod;
+    uint64_t logCTRResetPeriod;
     const int64_t initialTCounterValue;
     unsigned numUseAltOnNa;
     unsigned useAltOnNaBits;

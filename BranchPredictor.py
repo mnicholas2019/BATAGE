@@ -166,14 +166,15 @@ class BATAGEBase(SimObject):
         "Log num of prediction entries for a shared hysteresis bit " \
         "for the Bimodal")
 
-    tagTableCounterBits = Param.Unsigned(3, "Number of tag table counter bits")
-    tagTableUBits = Param.Unsigned(2, "Number of tag table u bits")
+    tagTableCounterDownBits = Param.Unsigned(3, "Number of tag table counter bits")
+    #tagTableUBits = Param.Unsigned(2, "Number of tag table u bits")
+    tagTableCounterUpBits = Param.Unsigned(3, "Number of tag table counter up bits")
 
     histBufferSize = Param.Unsigned(2097152,
             "A large number to track all branch histories(2MEntries default)")
 
     pathHistBits = Param.Unsigned(16, "Path history size")
-    logUResetPeriod = Param.Unsigned(18,
+    logCTRResetPeriod = Param.Unsigned(18,
         "Log period in number of branches to reset BATAGE useful counters")
     numUseAltOnNa = Param.Unsigned(1, "Number of USE_ALT_ON_NA counters")
     initialTCounterValue = Param.Int(1 << 17, "Initial value of tCounter")
