@@ -224,7 +224,7 @@ class BATAGEBase : public SimObject
      * @param nbits Counter width.
      */
     template<typename T>
-    static void ctrUpdate(T & ctr, bool taken, int nbits);
+    static void ctrUpdate(T & ctr_up, T & ctr_down, bool taken, int nbits);
 
     /**
      * Updates an unsigned counter based on up/down parameter
@@ -233,7 +233,7 @@ class BATAGEBase : public SimObject
      * If true it is incremented, if false it is decremented
      * @param nbits Counter width.
      */
-    static void unsignedCtrUpdate(uint8_t & ctr, bool up, unsigned nbits);
+    static void unsignedCtrUpdate(uint8_t & ctr_up, T & ctr_down bool up, unsigned nbits);
 
     /**
      * Get a branch prediction from the bimodal
@@ -395,7 +395,7 @@ class BATAGEBase : public SimObject
     /**
      * Algorithm for resetting a single U counter
      */
-    virtual void resetUctr(uint8_t & ctr_down, uint8_t & ctr_down);
+    virtual void resetUctr(uint8_t & ctr_up, uint8_t & ctr_down);
 
     /**
      * Extra steps for calculating altTaken

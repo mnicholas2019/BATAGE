@@ -49,8 +49,9 @@ BATAGEBase::BATAGEBase(const BATAGEBaseParams *p)
    : SimObject(p),
      logRatioBiModalHystEntries(p->logRatioBiModalHystEntries),
      nHistoryTables(p->nHistoryTables),
-     tagTableCounterBits(p->tagTableCounterBits),
-     tagTableUBits(p->tagTableUBits),
+     tagTableCounterUpBits(p->tagTableCounterUpBits),
+     tagTableCounterDownBits(p->tagTableCounterDownBits),
+     //tagTableUBits(p->tagTableUBits),
      histBufferSize(p->histBufferSize),
      minHist(p->minHist),
      maxHist(p->maxHist),
@@ -58,7 +59,7 @@ BATAGEBase::BATAGEBase(const BATAGEBaseParams *p)
      tagTableTagWidths(p->tagTableTagWidths),
      logTagTableSizes(p->logTagTableSizes),
      threadHistory(p->numThreads),
-     logUResetPeriod(p->logUResetPeriod),
+     logCTRResetPeriod(p->logCTRResetPeriod),
      initialTCounterValue(p->initialTCounterValue),
      numUseAltOnNa(p->numUseAltOnNa),
      useAltOnNaBits(p->useAltOnNaBits),
@@ -88,14 +89,14 @@ BATAGEBase::init()
     // Current method for periodically resetting the u counter bits only
     // works for 1 or 2 bits
     // Also make sure that it is not 0
-    assert(tagTableUBits <= 2 && (tagTableUBits > 0));
+    //assert(tagTableUBits <= 2 && (tagTableUBits > 0));
 
     // we use int type for the path history, so it cannot be more than
     // its size
     assert(pathHistBits <= (sizeof(int)*8));
 
     // initialize the counter to half of the period
-    assert(logUResetPeriod != 0);
+    assert(logCTRResetPeriod != 0);
     tCounter = initialTCounterValue;
 
     assert(histBufferSize > maxHist * 2);
@@ -253,16 +254,29 @@ BATAGEBase::gtag(ThreadID tid, Addr pc, int bank) const
 // Up-down saturating counter
 template<typename T>
 void
-BATAGEBase::ctrUpdate(T & ctr, bool taken, int nbits)
+BATAGEBase::ctrUpdate(T & ctr_up, T & ctr_down, bool taken, int nbits)
 {
     assert(nbits <= sizeof(T) << 3);
-    if (taken) {
+    /*if (taken) {
         if (ctr < ((1 << (nbits - 1)) - 1))
             ctr++;
     } else {
         if (ctr > -(1 << (nbits - 1)))
             ctr--;
+    }*/
+    if (taken) {
+        if (ctr_up < ((1 << (nbits - 1)) - 1))
+            ctr_up++;
+        else if (ctr_down > 0)
+            ctr_down--;
     }
+    else {
+        if (ctr_down < ((1 << (nbits - 1)) - 1))
+            ctr_down++;
+        else if (ctr_up > 0)
+            ctr_up++;
+    }
+
 }
 
 // int8_t and int versions of this function may be needed
