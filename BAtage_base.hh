@@ -233,7 +233,7 @@ class BATAGEBase : public SimObject
      * If true it is incremented, if false it is decremented
      * @param nbits Counter width.
      */
-    static void unsignedCtrUpdate(uint8_t & ctr_up, T & ctr_down bool up, unsigned nbits);
+    static void unsignedCtrUpdate(uint8_t & ctr_up, uint8_t & ctr_down, bool up, unsigned nbits);
 
     /**
      * Get a branch prediction from the bimodal

@@ -256,7 +256,7 @@ template<typename T>
 void
 BATAGEBase::ctrUpdate(T & ctr_up, T & ctr_down, bool taken, int nbits)
 {
-    assert(nbits <= sizeof(T) << 3);
+    //assert(nbits <= sizeof(T) << 3);
     /*if (taken) {
         if (ctr < ((1 << (nbits - 1)) - 1))
             ctr++;
@@ -264,17 +264,18 @@ BATAGEBase::ctrUpdate(T & ctr_up, T & ctr_down, bool taken, int nbits)
         if (ctr > -(1 << (nbits - 1)))
             ctr--;
     }*/
+    assert(nbits == 3);
     if (taken) {
-        if (ctr_up < ((1 << (nbits - 1)) - 1))
+        if (ctr_up < ((1 << (nbits)) - 1))
             ctr_up++;
         else if (ctr_down > 0)
             ctr_down--;
     }
     else {
-        if (ctr_down < ((1 << (nbits - 1)) - 1))
+        if (ctr_down < ((1 << (nbits)) - 1))
             ctr_down++;
         else if (ctr_up > 0)
-            ctr_up++;
+            ctr_up--;
     }
 
 }
@@ -285,16 +286,30 @@ template void BATAGEBase::ctrUpdate(int & ctr, bool taken, int nbits);
 
 // Up-down unsigned saturating counter
 void
-BATAGEBase::unsignedCtrUpdate(uint8_t & ctr, bool up, unsigned nbits)
+BATAGEBase::unsignedCtrUpdate(uint8_t & ctr_up, uint8_t & ctr_down, bool up, unsigned nbits)
 {
-    assert(nbits <= sizeof(uint8_t) << 3);
-    if (up) {
+    //assert(nbits <= sizeof(uint8_t) << 3);
+    /*if (up) {
         if (ctr < ((1 << nbits) - 1))
             ctr++;
     } else {
         if (ctr)
             ctr--;
+    }*/
+    assert(nbits == 3);
+    if (up) {
+        if (ctr_up < ((1 << (nbits)) - 1))
+            ctr_up++;
+        else if (ctr_down > 0)
+            ctr_down--;
     }
+    else {
+        if (ctr_down < ((1 << (nbits)) - 1))
+            ctr_down++;
+        else if (ctr_up > 0)
+            ctr_up--;
+    }
+
 }
 
 // Bimodal prediction
@@ -365,6 +380,8 @@ BATAGEBase::getUseAltIdx(BranchInfo* bi, Addr branch_pc)
     return 0;
 }
 
+
+
 bool
 BATAGEBase::BAtagePredict(ThreadID tid, Addr branch_pc,
               bool cond_branch, BranchInfo* bi)
@@ -381,12 +398,31 @@ BATAGEBase::BAtagePredict(ThreadID tid, Addr branch_pc,
 
         bi->hitBank = 0;
         bi->altBank = 0;
+        int bestConf = 4
+        int minCtr = 0;
+        double confidence = 0;
+        int curConf = 0;
         //Look for the bank with longest matching history
         for (int i = nHistoryTables; i > 0; i--) {
             if (noSkip[i] &&
                 gtable[i][tableIndices[i]].tag == tableTags[i]) {
-                bi->hitBank = i;
-                bi->hitBankIndex = tableIndices[bi->hitBank];
+
+                if (gtable[i][tableIndices[i]].ctr_up > gtable[i][tableIndices[i]].ctr_down)
+                    minCtr = gtable[i][tableIndices[i]].ctr_down;
+                else 
+                    minCtr = gtable[i][tableIndices[i]].ctr_up;
+                confidence = (1 + minCtr)/(2+ gtable[i][tableIndices[i]].ctr_up + gtable[i][tableIndices[i]].ctr_down);
+                if (confidence < 1/3)
+                    curConf = 0;
+                else if (confidence == 1/3)
+                    curConf = 1;
+                else
+                    curConf = 2;
+                if (curConf <= bestConf){
+                    bi->hitBank = i;
+                    bi->hitBankIndex = tableIndices[bi->hitBank];
+                    bestConf = curConf;
+                }
                 break;
             }
         }
@@ -394,8 +430,25 @@ BATAGEBase::BAtagePredict(ThreadID tid, Addr branch_pc,
         for (int i = bi->hitBank - 1; i > 0; i--) {
             if (noSkip[i] &&
                 gtable[i][tableIndices[i]].tag == tableTags[i]) {
-                bi->altBank = i;
-                bi->altBankIndex = tableIndices[bi->altBank];
+
+                if (gtable[i][tableIndices[i]].ctr_up > gtable[i][tableIndices[i]].ctr_down)
+                    minCtr = gtable[i][tableIndices[i]].ctr_down;
+                else 
+                    minCtr = gtable[i][tableIndices[i]].ctr_up;
+                confidence = (1 + minCtr)/(2+ gtable[i][tableIndices[i]].ctr_up + gtable[i][tableIndices[i]].ctr_down);
+                if (confidence < 1/3)
+                    curConf = 0;
+                else if (confidence == 1/3)
+                    curConf = 1;
+                else
+                    curConf = 2;
+
+                if (curConf <= bestConf){
+                    bi->altBank = i;
+                    bi->altBankIndex = tableIndices[bi->altBank];
+                    bestConf=curConf;
+                }
+                
                 break;
             }
         }
@@ -403,16 +456,19 @@ BATAGEBase::BAtagePredict(ThreadID tid, Addr branch_pc,
         if (bi->hitBank > 0) {
             if (bi->altBank > 0) {
                 bi->altTaken =
-                    gtable[bi->altBank][tableIndices[bi->altBank]].ctr >= 0;
+                    ((gtable[bi->altBank][tableIndices[bi->altBank]].ctr_up - 
+                    gtable[bi->altBank][tableIndices[bi->altBank]].ctr_down) >= 0
+                    );
                 extraAltCalc(bi);
             }else {
                 bi->altTaken = getBimodePred(pc, bi);
             }
 
             bi->longestMatchPred =
-                gtable[bi->hitBank][tableIndices[bi->hitBank]].ctr >= 0;
+                ((gtable[bi->hitBank][tableIndices[bi->hitBank]].ctr_up - 
+                gtable[bi->hitBank][tableIndices[bi->hitBank]].ctr_down) >= 0);
             bi->pseudoNewAlloc =
-                abs(2 * gtable[bi->hitBank][bi->hitBankIndex].ctr + 1) <= 1;
+                abs(2 * (gtable[bi->hitBank][bi->hitBankIndex].ctr_up - gtable[bi->hitBank][bi->hitBankIndex].ctr_down) + 1) <= 1;
 
             //if the entry is recognized as a newly allocated entry and
             //useAltPredForNewlyAllocated is positive use the alternate
