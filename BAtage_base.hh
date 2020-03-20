@@ -71,7 +71,7 @@ class BATAGEBase : public SimObject
     // BATage Entry
     struct BATageEntry
     {
-        int8_t ctr_up;
+        uint8_t ctr_up;
         uint16_t tag;
         uint8_t ctr_down;
         BATageEntry() : ctr_up(0), tag(0), ctr_down(0) { }
