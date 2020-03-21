@@ -1,4 +1,4 @@
-/*
+/*new
  * Copyright (c) 2014 The University of Wisconsin
  *
  * Copyright (c) 2006 INRIA (Institut National de Recherche en
@@ -281,8 +281,8 @@ BATAGEBase::ctrUpdate(T & ctr_up, T & ctr_down, bool taken, int nbits)
 }
 
 // int8_t and int versions of this function may be needed
-template void BATAGEBase::ctrUpdate(int8_t & ctr, bool taken, int nbits);
-template void BATAGEBase::ctrUpdate(int & ctr, bool taken, int nbits);
+// template void BATAGEBase::ctrUpdate(int8_t & ctr, bool taken, int nbits);
+// template void BATAGEBase::ctrUpdate(int & ctr, bool taken, int nbits);
 
 // Up-down unsigned saturating counter
 void
@@ -398,7 +398,7 @@ BATAGEBase::BAtagePredict(ThreadID tid, Addr branch_pc,
 
         bi->hitBank = 0;
         bi->altBank = 0;
-        int bestConf = 4
+        int bestConf = 4;
         int minCtr = 0;
         double confidence = 0;
         int curConf = 0;
@@ -513,8 +513,13 @@ BATAGEBase::handleAllocAndUReset(bool alloc, bool taken, BranchInfo* bi,
         // is there some "unuseful" entry to allocate
         uint8_t min = 0;
         uint8_t curConf;
+        double confidence;
+        int minCtr;
         for (int i = nHistoryTables; i > bi->hitBank; i--) {
-
+            if (gtable[i][tableIndices[i]].ctr_up > gtable[i][tableIndices[i]].ctr_down)
+                    minCtr = gtable[i][tableIndices[i]].ctr_down;
+                else 
+                    minCtr = gtable[i][tableIndices[i]].ctr_up;
             confidence = (1 + minCtr)/(2+ gtable[i][tableIndices[i]].ctr_up + gtable[i][tableIndices[i]].ctr_down);
             if (confidence < 1/3)
                 curConf = 0;
@@ -548,7 +553,13 @@ BATAGEBase::handleAllocAndUReset(bool alloc, bool taken, BranchInfo* bi,
 
         //Allocate entries
         unsigned numAllocated = 0;
+        double confidence;
+        int minCtr;
         for (int i = X; i <= nHistoryTables; i++) {
+            if (gtable[i][tableIndices[i]].ctr_up > gtable[i][tableIndices[i]].ctr_down)
+                minCtr = gtable[i][tableIndices[i]].ctr_down;
+            else 
+                minCtr = gtable[i][tableIndices[i]].ctr_up;
             confidence = (1 + minCtr)/(2+ gtable[i][tableIndices[i]].ctr_up + gtable[i][tableIndices[i]].ctr_down);
             if (confidence < 1/3)
                 curConf = 0;
@@ -661,8 +672,21 @@ BATAGEBase::handleBATAGEUpdate(Addr branch_pc, bool taken, BranchInfo* bi)
                   3);
         // if the provider entry is not certified to be useful also update
         // the alternate prediction
-        if (gtable[bi->hitBank][bi->hitBankIndex].u == 0) {
-            if (bi->altBank > 0) {
+
+        //if (gtable[bi->hitBank][bi->hitBankIndex].u == 0) {
+        if (gtable[i][tableIndices[i]].ctr_up > gtable[i][tableIndices[i]].ctr_down)
+                    minCtr = gtable[i][tableIndices[i]].ctr_down;
+        else 
+            minCtr = gtable[i][tableIndices[i]].ctr_up;
+        confidence = (1 + minCtr)/(2+ gtable[i][tableIndices[i]].ctr_up + gtable[i][tableIndices[i]].ctr_down);
+        if (confidence < 1/3)
+            curConf = 0;
+        else if (confidence == 1/3)
+            curConf = 1;
+        else
+            curConf = 2;
+        if (curConf >=1) {
+        if (bi->altBank > 0) {
                 ctrUpdate(gtable[bi->altBank][bi->altBankIndex].ctr_up, gtable[bi->hitBank][bi->hitBankIndex].ctr_down, taken,
                           3);
                 DPRINTF(BATage, "Updating tag table entry (%d,%d) for"
