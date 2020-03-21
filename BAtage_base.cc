@@ -511,11 +511,22 @@ BATAGEBase::handleAllocAndUReset(bool alloc, bool taken, BranchInfo* bi,
 {
     if (alloc) {
         // is there some "unuseful" entry to allocate
-        uint8_t min = 1;
+        uint8_t min = 0;
+        uint8_t curConf;
         for (int i = nHistoryTables; i > bi->hitBank; i--) {
-            if (gtable[i][bi->tableIndices[i]].u < min) {
-                min = gtable[i][bi->tableIndices[i]].u;
-            }
+
+            confidence = (1 + minCtr)/(2+ gtable[i][tableIndices[i]].ctr_up + gtable[i][tableIndices[i]].ctr_down);
+            if (confidence < 1/3)
+                curConf = 0;
+            else if (confidence == 1/3)
+                curConf = 1;
+            else
+                curConf = 2;
+            if (curConf >= 1)
+                min = curConf;
+            // if (gtable[i][bi->tableIndices[i]].u < min) {
+            //     min = gtable[i][bi->tableIndices[i]].u;
+            // }
         }
 
         // we allocate an entry with a longer history
@@ -530,22 +541,39 @@ BATAGEBase::handleAllocAndUReset(bool alloc, bool taken, BranchInfo* bi,
                 X++;
         }
         // No entry available, forces one to be available
-        if (min > 0) {
-            gtable[X][bi->tableIndices[X]].u = 0;
-        }
+        // if (min > 0) {
+        //     gtable[X][bi->tableIndices[X]].u = 0;
+        // }
 
 
         //Allocate entries
         unsigned numAllocated = 0;
         for (int i = X; i <= nHistoryTables; i++) {
-            if ((gtable[i][bi->tableIndices[i]].u == 0)) {
+            confidence = (1 + minCtr)/(2+ gtable[i][tableIndices[i]].ctr_up + gtable[i][tableIndices[i]].ctr_down);
+            if (confidence < 1/3)
+                curConf = 0;
+            else if (confidence == 1/3)
+                curConf = 1;
+            else
+                curConf = 2;
+
+            if (curConf >= 1){
                 gtable[i][bi->tableIndices[i]].tag = bi->tableTags[i];
-                gtable[i][bi->tableIndices[i]].ctr = (taken) ? 0 : -1;
+                gtable[i][bi->tableIndices[i]].ctr_up = (taken) ? 1: 0;
+                gtable[i][bi->tableIndices[i]].ctr_down = (taken) ? 0: -1;
                 ++numAllocated;
                 if (numAllocated == maxNumAlloc) {
                     break;
                 }
             }
+            // if ((gtable[i][bi->tableIndices[i]].u == 0)) {
+            //     gtable[i][bi->tableIndices[i]].tag = bi->tableTags[i];
+            //     gtable[i][bi->tableIndices[i]].ctr = (taken) ? 0 : -1;
+            //     ++numAllocated;
+            //     if (numAllocated == maxNumAlloc) {
+            //         break;
+            //     }
+            // }
         }
     }
 
@@ -558,21 +586,27 @@ void
 BATAGEBase::handleUReset()
 {
     //periodic reset of u: reset is not complete but bit by bit
-    if ((tCounter & ((ULL(1) << logUResetPeriod) - 1)) == 0) {
+    if ((tCounter & ((ULL(1) << logCTRResetPeriod) - 1)) == 0) {
         // reset least significant bit
         // most significant bit becomes least significant bit
         for (int i = 1; i <= nHistoryTables; i++) {
             for (int j = 0; j < (ULL(1) << logTagTableSizes[i]); j++) {
-                resetUctr(gtable[i][j].u);
+                resetUctr(gtable[i][j].ctr_up, gtable[i][j].ctr_down);
             }
         }
     }
 }
 
 void
-BATAGEBase::resetUctr(uint8_t & u)
+BATAGEBase::resetUctr(uint8_t & ctr_up, uint8_t & ctr_down)
 {
-    u >>= 1;
+    //u >>= 1;
+    if (ctr_up > ctr_down){
+        ctr_up--;
+    }
+    else if (ctr_down > ctr_up){
+        ctr_down--;
+    }
 }
 
 void
@@ -602,6 +636,7 @@ BATAGEBase::condBranchUpdate(ThreadID tid, Addr branch_pc, bool taken,
             if (bi->longestMatchPred != bi->altTaken) {
                 ctrUpdate(
                     useAltPredForNewlyAllocated[getUseAltIdx(bi, branch_pc)],
+                    useAltPredForNewlyAllocated[getUseAltIdx(bi, branch_pc)],
                     bi->altTaken == taken, useAltOnNaBits);
             }
         }
@@ -622,14 +657,14 @@ BATAGEBase::handleBATAGEUpdate(Addr branch_pc, bool taken, BranchInfo* bi)
     if (bi->hitBank > 0) {
         DPRINTF(BATage, "Updating tag table entry (%d,%d) for branch %lx\n",
                 bi->hitBank, bi->hitBankIndex, branch_pc);
-        ctrUpdate(gtable[bi->hitBank][bi->hitBankIndex].ctr, taken,
-                  tagTableCounterBits);
+        ctrUpdate(gtable[bi->hitBank][bi->hitBankIndex].ctr_up, gtable[bi->hitBank][bi->hitBankIndex].ctr_down, taken,
+                  3);
         // if the provider entry is not certified to be useful also update
         // the alternate prediction
         if (gtable[bi->hitBank][bi->hitBankIndex].u == 0) {
             if (bi->altBank > 0) {
-                ctrUpdate(gtable[bi->altBank][bi->altBankIndex].ctr, taken,
-                          tagTableCounterBits);
+                ctrUpdate(gtable[bi->altBank][bi->altBankIndex].ctr_up, gtable[bi->hitBank][bi->hitBankIndex].ctr_down, taken,
+                          3);
                 DPRINTF(BATage, "Updating tag table entry (%d,%d) for"
                         " branch %lx\n", bi->hitBank, bi->hitBankIndex,
                         branch_pc);
@@ -641,8 +676,8 @@ BATAGEBase::handleBATAGEUpdate(Addr branch_pc, bool taken, BranchInfo* bi)
 
         // update the u counter
         if (bi->BAtagePred != bi->altTaken) {
-            unsignedCtrUpdate(gtable[bi->hitBank][bi->hitBankIndex].u,
-                              bi->BAtagePred == taken, tagTableUBits);
+            unsignedCtrUpdate(gtable[bi->hitBank][bi->hitBankIndex].ctr_up,gtable[bi->hitBank][bi->hitBankIndex].ctr_down,
+                              bi->BAtagePred == taken, 3);
         }
     } else {
         baseUpdate(branch_pc, taken, bi);
@@ -850,15 +885,28 @@ BATAGEBase::regStats()
 }
 
 int8_t
-BATAGEBase::getCtr(int hitBank, int hitBankIndex) const
+BATAGEBase::getCtr_up(int hitBank, int hitBankIndex) const
 {
-    return gtable[hitBank][hitBankIndex].ctr;
+    return gtable[hitBank][hitBankIndex].ctr_up;
+}
+
+int8_t
+BATAGEBase::getCtr_down(int hitBank, int hitBankIndex) const
+{
+    return gtable[hitBank][hitBankIndex].ctr_down;
+}
+
+
+unsigned
+BATAGEBase::getBATageCtrUpBits() const
+{
+    return tagTableCounterUpBits;
 }
 
 unsigned
-BATAGEBase::getBATageCtrBits() const
+BATAGEBase::getBATageCtrDownBits() const
 {
-    return tagTableCounterBits;
+    return tagTableCounterDownBits;
 }
 
 int
@@ -878,7 +926,7 @@ BATAGEBase::getSizeInBits() const {
     size_t bits = 0;
     for (int i = 1; i <= nHistoryTables; i++) {
         bits += (1 << logTagTableSizes[i]) *
-            (tagTableCounterBits + tagTableUBits + tagTableTagWidths[i]);
+            (tagTableCounterUpBits + tagTableCounterDownBits + tagTableTagWidths[i]);
     }
     uint64_t bimodalTableSize = ULL(1) << logTagTableSizes[0];
     bits += numUseAltOnNa * useAltOnNaBits;
@@ -886,7 +934,7 @@ BATAGEBase::getSizeInBits() const {
     bits += (bimodalTableSize >> logRatioBiModalHystEntries);
     bits += histLengths[nHistoryTables];
     bits += pathHistBits;
-    bits += logUResetPeriod;
+    bits += logCTRResetPeriod;
     return bits;
 }
 
