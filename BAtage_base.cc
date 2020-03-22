@@ -62,7 +62,7 @@ BATAGEBase::BATAGEBase(const BATAGEBaseParams *p)
      logCTRResetPeriod(p->logCTRResetPeriod),
      initialTCounterValue(p->initialTCounterValue),
      numUseAltOnNa(p->numUseAltOnNa),
-     useAltOnNaBits(p->useAltOnNaBits),
+     // useAltOnNaBits(p->useAltOnNaBits),
      maxNumAlloc(p->maxNumAlloc),
      noSkip(p->noSkip),
      speculativeHistUpdate(p->speculativeHistUpdate),
@@ -649,7 +649,8 @@ BATAGEBase::condBranchUpdate(ThreadID tid, Addr branch_pc, bool taken,
                 ctrUpdate(
                     useAltPredForNewlyAllocated[getUseAltIdx(bi, branch_pc)],
                     useAltPredForNewlyAllocated[getUseAltIdx(bi, branch_pc)],
-                    bi->altTaken == taken, useAltOnNaBits);
+                    bi->altTaken == taken, 3);
+                    // bi->altTaken == taken, useAltOnNaBits);
             }
         }
     }
@@ -959,7 +960,8 @@ BATAGEBase::getSizeInBits() const {
             (tagTableCounterUpBits + tagTableCounterDownBits + tagTableTagWidths[i]);
     }
     uint64_t bimodalTableSize = ULL(1) << logTagTableSizes[0];
-    bits += numUseAltOnNa * useAltOnNaBits;
+    // bits += numUseAltOnNa * useAltOnNaBits;
+    bits += numUseAltOnNa * 3;
     bits += bimodalTableSize;
     bits += (bimodalTableSize >> logRatioBiModalHystEntries);
     bits += histLengths[nHistoryTables];
