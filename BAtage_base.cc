@@ -62,7 +62,7 @@ BATAGEBase::BATAGEBase(const BATAGEBaseParams *p)
      logCTRResetPeriod(p->logCTRResetPeriod),
      initialTCounterValue(p->initialTCounterValue),
      numUseAltOnNa(p->numUseAltOnNa),
-     useAltOnNaBits(p->useAltOnNaBits),
+     // useAltOnNaBits(p->useAltOnNaBits),
      maxNumAlloc(p->maxNumAlloc),
      noSkip(p->noSkip),
      speculativeHistUpdate(p->speculativeHistUpdate),
@@ -531,7 +531,7 @@ BATAGEBase::handleAllocAndUReset(bool alloc, bool taken, BranchInfo* bi,
         uint8_t min = 0;
         uint8_t curConf;
         double confidence;
-        int minCtr;
+        int minCtr = 0;
         for (int i = nHistoryTables; i > bi->hitBank; i--) {
             if (gtable[i][tableIndices[i]].ctr_up > gtable[i][tableIndices[i]].ctr_down)
                     minCtr = gtable[i][tableIndices[i]].ctr_down;
@@ -563,15 +563,16 @@ BATAGEBase::handleAllocAndUReset(bool alloc, bool taken, BranchInfo* bi,
                 X++;
         }
         // No entry available, forces one to be available
-        // if (min > 0) {
-        //     gtable[X][bi->tableIndices[X]].u = 0;
-        // }
+        if (min < 1) {
+            gtable[X][bi->tableIndices[X]].ctr_up = 0;
+            gtable[X][bi->tableIndices[X]].ctr_down = 0;
+        }
 
 
         //Allocate entries
         unsigned numAllocated = 0;
-        double confidence;
-        int minCtr;
+        // double confidence;
+        // int minCtr;
         for (int i = X; i <= nHistoryTables; i++) {
             if (gtable[i][tableIndices[i]].ctr_up > gtable[i][tableIndices[i]].ctr_down)
                 minCtr = gtable[i][tableIndices[i]].ctr_down;
@@ -665,7 +666,8 @@ BATAGEBase::condBranchUpdate(ThreadID tid, Addr branch_pc, bool taken,
                 ctrUpdate(
                     useAltPredForNewlyAllocated[getUseAltIdx(bi, branch_pc)],
                     useAltPredForNewlyAllocated[getUseAltIdx(bi, branch_pc)],
-                    bi->altTaken == taken, useAltOnNaBits);
+                    bi->altTaken == taken, 3);
+                    // bi->altTaken == taken, useAltOnNaBits);
             }
         }
     }
@@ -683,6 +685,11 @@ void
 BATAGEBase::handleBATAGEUpdate(Addr branch_pc, bool taken, BranchInfo* bi)
 {
     if (bi->hitBank > 0) {
+        
+        uint8_t curConf;
+        int minCtr;
+        double confidence;
+
         DPRINTF(BATage, "Updating tag table entry (%d,%d) for branch %lx\n",
                 bi->hitBank, bi->hitBankIndex, branch_pc);
         ctrUpdate(gtable[bi->hitBank][bi->hitBankIndex].ctr_up, gtable[bi->hitBank][bi->hitBankIndex].ctr_down, taken,
@@ -691,11 +698,11 @@ BATAGEBase::handleBATAGEUpdate(Addr branch_pc, bool taken, BranchInfo* bi)
         // the alternate prediction
 
         //if (gtable[bi->hitBank][bi->hitBankIndex].u == 0) {
-        if (gtable[i][tableIndices[i]].ctr_up > gtable[i][tableIndices[i]].ctr_down)
-                    minCtr = gtable[i][tableIndices[i]].ctr_down;
+        if (gtable[bi->hitBank][bi->hitBankIndex].ctr_up > gtable[bi->hitBank][bi->hitBankIndex].ctr_down)
+                    minCtr = gtable[bi->hitBank][bi->hitBankIndex].ctr_down;
         else 
-            minCtr = gtable[i][tableIndices[i]].ctr_up;
-        confidence = (1 + minCtr)/(2+ gtable[i][tableIndices[i]].ctr_up + gtable[i][tableIndices[i]].ctr_down);
+            minCtr = gtable[bi->hitBank][bi->hitBankIndex].ctr_up;
+        confidence = (1 + minCtr)/(2+ gtable[bi->hitBank][bi->hitBankIndex].ctr_up + gtable[bi->hitBank][bi->hitBankIndex].ctr_down);
         if (confidence < 1/3)
             curConf = 0;
         else if (confidence == 1/3)
@@ -970,7 +977,8 @@ BATAGEBase::getSizeInBits() const {
             (tagTableCounterUpBits + tagTableCounterDownBits + tagTableTagWidths[i]);
     }
     uint64_t bimodalTableSize = ULL(1) << logTagTableSizes[0];
-    bits += numUseAltOnNa * useAltOnNaBits;
+    // bits += numUseAltOnNa * useAltOnNaBits;
+    bits += numUseAltOnNa * 3;
     bits += bimodalTableSize;
     bits += (bimodalTableSize >> logRatioBiModalHystEntries);
     bits += histLengths[nHistoryTables];
