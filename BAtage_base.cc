@@ -444,7 +444,7 @@ BATAGEBase::BAtagePredict(ThreadID tid, Addr branch_pc,
                 if (confidence <= bestConf){
                     bi->altBank = i;
                     bi->altBankIndex = tableIndices[bi->altBank];
-                    bestConf=curConf;
+                    bestConf=confidence;
                 }
                 
                 break;
@@ -511,7 +511,6 @@ BATAGEBase::handleAllocAndUReset(bool alloc, bool taken, BranchInfo* bi,
         // is there some "unuseful" entry to allocate
         uint8_t worstConfidence = 0;
         double confidence;
-        int minCtr = 0;
         for (int i = nHistoryTables; i > bi->hitBank; i--) {
             confidence = getConfidence(gtable[i][tableIndices[i]].ctr_up, 
                                             gtable[i][tableIndices[i]].ctr_down);
@@ -656,8 +655,8 @@ BATAGEBase::handleBATAGEUpdate(Addr branch_pc, bool taken, BranchInfo* bi)
         // the alternate prediction
 
         //if (gtable[bi->hitBank][bi->hitBankIndex].u == 0) {
-        confidence = getConfidence(gtable[i][tableIndices[i]].ctr_up, 
-                                            gtable[i][tableIndices[i]].ctr_down);
+        confidence = getConfidence(gtable[bi->hitBank][bi->hitBankIndex].ctr_up, 
+                                            gtable[bi->hitBank][bi->hitBankIndex].ctr_down);
         if (confidence >=1) {
             if (bi->altBank > 0) {
                 ctrUpdate(gtable[bi->altBank][bi->altBankIndex].ctr_up, gtable[bi->hitBank][bi->hitBankIndex].ctr_down, taken,
