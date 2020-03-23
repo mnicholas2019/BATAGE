@@ -415,52 +415,33 @@ BATAGEBase::BAtagePredict(ThreadID tid, Addr branch_pc,
 
         bi->hitBank = 0;
         bi->altBank = 0;
-        int bestConf = 4;
-        int minCtr = 0;
         double confidence = 0;
-        int curConf = 0;
+        double bestConf = 4;
         //Look for the bank with longest matching history
         for (int i = nHistoryTables; i > 0; i--) {
             if (noSkip[i] &&
                 gtable[i][tableIndices[i]].tag == tableTags[i]) {
 
-                if (gtable[i][tableIndices[i]].ctr_up > gtable[i][tableIndices[i]].ctr_down)
-                    minCtr = gtable[i][tableIndices[i]].ctr_down;
-                else 
-                    minCtr = gtable[i][tableIndices[i]].ctr_up;
-                confidence = (1 + minCtr)/(2+ gtable[i][tableIndices[i]].ctr_up + gtable[i][tableIndices[i]].ctr_down);
-                if (confidence < 1/3)
-                    curConf = 0;
-                else if (confidence == 1/3)
-                    curConf = 1;
-                else
-                    curConf = 2;
-                if (curConf <= bestConf){
+                confidence = getConfidence(gtable[i][tableIndices[i]].ctr_up, 
+                                            gtable[i][tableIndices[i]].ctr_down);
+                if (confidence <= bestConf){
                     bi->hitBank = i;
                     bi->hitBankIndex = tableIndices[bi->hitBank];
-                    bestConf = curConf;
+                    bestConf = confidence;
                 }
                 break;
             }
         }
         //Look for the alternate bank
+        bestConf = 4;
         for (int i = bi->hitBank - 1; i > 0; i--) {
             if (noSkip[i] &&
                 gtable[i][tableIndices[i]].tag == tableTags[i]) {
 
-                if (gtable[i][tableIndices[i]].ctr_up > gtable[i][tableIndices[i]].ctr_down)
-                    minCtr = gtable[i][tableIndices[i]].ctr_down;
-                else 
-                    minCtr = gtable[i][tableIndices[i]].ctr_up;
-                confidence = (1 + minCtr)/(2+ gtable[i][tableIndices[i]].ctr_up + gtable[i][tableIndices[i]].ctr_down);
-                if (confidence < 1/3)
-                    curConf = 0;
-                else if (confidence == 1/3)
-                    curConf = 1;
-                else
-                    curConf = 2;
+                confidence = getConfidence(gtable[i][tableIndices[i]].ctr_up, 
+                                            gtable[i][tableIndices[i]].ctr_down);
 
-                if (curConf <= bestConf){
+                if (confidence <= bestConf){
                     bi->altBank = i;
                     bi->altBankIndex = tableIndices[bi->altBank];
                     bestConf=curConf;
@@ -528,24 +509,14 @@ BATAGEBase::handleAllocAndUReset(bool alloc, bool taken, BranchInfo* bi,
 {
     if (alloc) {
         // is there some "unuseful" entry to allocate
-        uint8_t min = 0;
-        uint8_t curConf;
+        uint8_t worstConfidence = 0;
         double confidence;
         int minCtr = 0;
         for (int i = nHistoryTables; i > bi->hitBank; i--) {
-            if (gtable[i][tableIndices[i]].ctr_up > gtable[i][tableIndices[i]].ctr_down)
-                    minCtr = gtable[i][tableIndices[i]].ctr_down;
-                else 
-                    minCtr = gtable[i][tableIndices[i]].ctr_up;
-            confidence = (1 + minCtr)/(2+ gtable[i][tableIndices[i]].ctr_up + gtable[i][tableIndices[i]].ctr_down);
-            if (confidence < 1/3)
-                curConf = 0;
-            else if (confidence == 1/3)
-                curConf = 1;
-            else
-                curConf = 2;
-            if (curConf >= 1)
-                min = curConf;
+            confidence = getConfidence(gtable[i][tableIndices[i]].ctr_up, 
+                                            gtable[i][tableIndices[i]].ctr_down);
+            if (confidence >= 1)
+                worstConfidence = confidence;
             // if (gtable[i][bi->tableIndices[i]].u < min) {
             //     min = gtable[i][bi->tableIndices[i]].u;
             // }
@@ -563,7 +534,7 @@ BATAGEBase::handleAllocAndUReset(bool alloc, bool taken, BranchInfo* bi,
                 X++;
         }
         // No entry available, forces one to be available
-        if (min < 1) {
+        if (worstConfidence < 1) {
             gtable[X][bi->tableIndices[X]].ctr_up = 0;
             gtable[X][bi->tableIndices[X]].ctr_down = 0;
         }
@@ -571,22 +542,11 @@ BATAGEBase::handleAllocAndUReset(bool alloc, bool taken, BranchInfo* bi,
 
         //Allocate entries
         unsigned numAllocated = 0;
-        // double confidence;
-        // int minCtr;
         for (int i = X; i <= nHistoryTables; i++) {
-            if (gtable[i][tableIndices[i]].ctr_up > gtable[i][tableIndices[i]].ctr_down)
-                minCtr = gtable[i][tableIndices[i]].ctr_down;
-            else 
-                minCtr = gtable[i][tableIndices[i]].ctr_up;
-            confidence = (1 + minCtr)/(2+ gtable[i][tableIndices[i]].ctr_up + gtable[i][tableIndices[i]].ctr_down);
-            if (confidence < 1/3)
-                curConf = 0;
-            else if (confidence == 1/3)
-                curConf = 1;
-            else
-                curConf = 2;
+            confidence = getConfidence(gtable[i][tableIndices[i]].ctr_up, 
+                                            gtable[i][tableIndices[i]].ctr_down);
 
-            if (curConf >= 1){
+            if (confidence >= 1){
                 gtable[i][bi->tableIndices[i]].tag = bi->tableTags[i];
                 gtable[i][bi->tableIndices[i]].ctr_up = (taken) ? 1: 0;
                 gtable[i][bi->tableIndices[i]].ctr_down = (taken) ? 0: 1;
@@ -686,8 +646,6 @@ BATAGEBase::handleBATAGEUpdate(Addr branch_pc, bool taken, BranchInfo* bi)
 {
     if (bi->hitBank > 0) {
         
-        uint8_t curConf;
-        int minCtr;
         double confidence;
 
         DPRINTF(BATage, "Updating tag table entry (%d,%d) for branch %lx\n",
@@ -698,19 +656,10 @@ BATAGEBase::handleBATAGEUpdate(Addr branch_pc, bool taken, BranchInfo* bi)
         // the alternate prediction
 
         //if (gtable[bi->hitBank][bi->hitBankIndex].u == 0) {
-        if (gtable[bi->hitBank][bi->hitBankIndex].ctr_up > gtable[bi->hitBank][bi->hitBankIndex].ctr_down)
-                    minCtr = gtable[bi->hitBank][bi->hitBankIndex].ctr_down;
-        else 
-            minCtr = gtable[bi->hitBank][bi->hitBankIndex].ctr_up;
-        confidence = (1 + minCtr)/(2+ gtable[bi->hitBank][bi->hitBankIndex].ctr_up + gtable[bi->hitBank][bi->hitBankIndex].ctr_down);
-        if (confidence < 1/3)
-            curConf = 0;
-        else if (confidence == 1/3)
-            curConf = 1;
-        else
-            curConf = 2;
-        if (curConf >=1) {
-        if (bi->altBank > 0) {
+        confidence = getConfidence(gtable[i][tableIndices[i]].ctr_up, 
+                                            gtable[i][tableIndices[i]].ctr_down);
+        if (confidence >=1) {
+            if (bi->altBank > 0) {
                 ctrUpdate(gtable[bi->altBank][bi->altBankIndex].ctr_up, gtable[bi->hitBank][bi->hitBankIndex].ctr_down, taken,
                           3);
                 DPRINTF(BATage, "Updating tag table entry (%d,%d) for"

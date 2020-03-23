@@ -372,7 +372,7 @@ class BATAGEBase : public SimObject
      * Calculates the confidence from the values of the up and
      * down counter
      */
-    int getConfidence(int ctr_up, int ctr_down)
+    int getConfidence(int ctr_up, int ctr_down);
 
     /**
      * Extra calculation to tell whether BATAGE allocaitons may happen or not
