@@ -369,6 +369,12 @@ class BATAGEBase : public SimObject
     virtual unsigned getUseAltIdx(BranchInfo* bi, Addr branch_pc);
 
     /**
+     * Calculates the confidence from the values of the up and
+     * down counter
+     */
+    int getConfidence(int ctr_up, int ctr_down)
+
+    /**
      * Extra calculation to tell whether BATAGE allocaitons may happen or not
      * on an update
      * For this base BATAGE implementation it does nothing

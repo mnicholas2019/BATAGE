@@ -381,6 +381,23 @@ BATAGEBase::getUseAltIdx(BranchInfo* bi, Addr branch_pc)
 }
 
 
+int
+BATAGEBase::getConfidence(int ctr_up, int ctr_down)
+{
+    int minCtr = (ctr_up > ctr_down) ? ctr_down : ctr_up;
+    
+    double confidence = (1 + minCtr)/(2+ ctr_up + ctr_down);
+
+    if (confidence < 1/3)
+        confidence = 0;
+    else if (confidence == 1/3)
+        confidence = 1;
+    else
+        confidence = 2;
+    return confidence
+
+}
+
 
 bool
 BATAGEBase::BAtagePredict(ThreadID tid, Addr branch_pc,
@@ -571,7 +588,7 @@ BATAGEBase::handleAllocAndUReset(bool alloc, bool taken, BranchInfo* bi,
             if (curConf >= 1){
                 gtable[i][bi->tableIndices[i]].tag = bi->tableTags[i];
                 gtable[i][bi->tableIndices[i]].ctr_up = (taken) ? 1: 0;
-                gtable[i][bi->tableIndices[i]].ctr_down = (taken) ? 0: -1;
+                gtable[i][bi->tableIndices[i]].ctr_down = (taken) ? 0: 1;
                 ++numAllocated;
                 if (numAllocated == maxNumAlloc) {
                     break;
