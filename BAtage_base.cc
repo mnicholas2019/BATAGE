@@ -394,7 +394,7 @@ BATAGEBase::getConfidence(int ctr_up, int ctr_down)
         confidence = 1;
     else
         confidence = 2;
-    return confidence
+    return confidence;
 
 }
 
